@@ -8,12 +8,15 @@ import java.util.NoSuchElementException;
  * We use a one-based indexing to simplify calculations of parent and 
  * child indexes.
  *
- * @param <T>
+ * @param <T> the queue element type
  */
 public class PriorityQueue<T extends Comparable<T>> {
 
     private ArrayList<T> heapArray;
 
+    /**
+     * Creates a PriorityQueue.
+     */
     public PriorityQueue() {
         this.heapArray = new ArrayList<>();
         

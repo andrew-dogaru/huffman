@@ -77,10 +77,9 @@ public class HuffmanDict {
         }
 
         /**
-         * Given a stream of '0's and '1's, return the character 
-         * associated with the code entered, or -1 if the code is incomplete. 
-         * @param code
-         * @return decoded character, or -1 if no character decoded yet
+         * Given a bit, return the decoded byte, or -1 if the code is incomplete. 
+         * @param bit a byte value, must be 0 or 1
+         * @return decoded byte, or -1 if no byte decoded yet
          */
         public byte read(byte bit) {
             if (bit == '0') {
@@ -197,7 +196,8 @@ public class HuffmanDict {
      *  - non-leaf node: (0, frequency, lefttree, righttree) 
      *  - leaf node: (1, frequency, byte_to_encode)
      *  Note that the tree is represented with ASCII codes for easy reading 
-     *  by a human. In a real case, the encoding can be 
+     *  by a human. To achieve better compression the encoding of the tree 
+     *  is binary.
      */
     public byte[] toBytes() {
         ByteArrayOutputStream sb = new ByteArrayOutputStream();

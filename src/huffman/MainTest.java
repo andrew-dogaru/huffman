@@ -9,12 +9,11 @@ import java.io.IOException;
 import util.Console;
 
 /**
- * Main program for Huffman encoding and decoding. 
+ * Test program for Huffman encoding and decoding.
  */
 public class MainTest {
     public static void main(String[] args) throws IOException {
         byte[] data = encode();
-        
         decode(data);
     }
 
@@ -75,13 +74,27 @@ public class MainTest {
         
         try {
             while(true) {
-                HuffmanDict.Decoder dec = dictionary.startDecoding();
+                HuffmanDict.Decoder decoder = dictionary.startDecoding();
                 byte decoded = -1;
                 do {
                     byte b = input.readByte();
-                    decoded = dec.read(b);
+                    
+                    for (int i = 0; i < 8; i++) {
+                        byte bit = (((1 << i) & b) != 0) ? (byte)'1' : (byte)'0'; 
+                        decoded = decoder.read(bit);
+                        
+                        if (decoded == -1)
+                            continue;
+
+                        // we decoded one byte
+                        System.out.print((char)decoded);
+
+                        // start with new decoder
+                        decoder = dictionary.startDecoding();
+                        decoded = -1;
+                    }
                 } while (decoded == -1);
-                
+
                 // we decoded one byte
                 System.out.print((char)decoded);
             }
@@ -113,15 +126,16 @@ public class MainTest {
     }
 
     /**
-     * Encode characters read from the input reader using the given encoder
-     * and write them into the specified writer.
+     * Encode bytes read from the input reader using the given encoder
+     * and write them into the specified output stream.  Code bits are 
+     * written as '0's or '1's as characters to help with debugging.
      * 
-     * @param input
-     * @param dict
-     * @param output
+     * @param input input stream contains data to encode
+     * @param dict Huffman dictionary
+     * @param output output stream, contains encoded data
      * @throws IOException if an error occurs during reading or writing
      */
-    static void writeData(DataInputStream input, HuffmanDict dict, 
+    static void writeAsString(DataInputStream input, HuffmanDict dict, 
             DataOutputStream output) throws IOException {
 
         StringBuilder encodedBits = new StringBuilder();
@@ -136,5 +150,133 @@ public class MainTest {
         
         // write the rest of the encoded bits
         output.write(encodedBits.toString().getBytes());
+    }
+    
+    /**
+     * Encode bytes read from the input reader using the given encoder
+     * and write them into the specified output stream.  Code bits are 
+     * written as bits, not characters.
+     * 
+     * @param input input stream contains data to encode
+     * @param dict Huffman dictionary
+     * @param output output stream, contains encoded data
+     * @throws IOException if an error occurs during reading or writing
+     */
+    static void writeData(DataInputStream input, HuffmanDict dict, 
+            DataOutputStream output) throws IOException {
+        // size of the bit array used to store encoded data, must be large
+        // enough to store at least two of the longest codes
+        final int BIT_SIZE = 2 * 8;
+        byte[] encodedBits = new byte[BIT_SIZE/8];
+        int bitCount = 0; // number of bits stored in encodedBits
+
+        for (int c = input.read(); c != -1; c = input.read()) {
+            String code = dict.encode((byte)c);
+            
+            int count = appendBits(encodedBits, bitCount, code);
+            bitCount += count;
+            if (count == 0) {
+                // must write the encodedBits to output to make room for more bits
+                byte[] bytes = encodedBits;
+                int byteCount = bitCount / 8;
+                
+                // write only the full bytes
+                output.write(bytes, 0, byteCount);
+                
+                // write the last incomplete byte into encodedBits, starting
+                // from position 0
+                int restBits = bitCount % 8;
+                byte lastByte = (restBits != 0) ? bytes[byteCount] : 0;
+                for (int i = 0; i < restBits; i++) {
+                    if ((lastByte & (1 << i)) != 0)
+                        bitSet(encodedBits, i);
+                    else
+                        bitClear(encodedBits, i);
+                }
+                bitCount = restBits;
+                
+                // we made room, try again to append the bits
+                count = appendBits(encodedBits, bitCount, code);
+                bitCount += count;
+                if (count == 0)
+                    throw new IllegalStateException("BitSet must be large enough to read one code");
+            }            
+        }
+        
+        // we reached the end of input, write the rest of the encoded bits
+        // (the last byte may contain extra bits)
+        byte[] bytes = encodedBits;
+        int byteCount = (bitCount + 7) / 8;
+        output.write(bytes, 0, byteCount);
+    }
+    
+//    /**
+//     * Appends bits from the given String into the bits BitSet, starting
+//     * with position pos.  Return the number of bits appended.
+//     * partial appends are not allowed.  If the String cannot be appended
+//     * in its entirety then don't append anything and return 0.
+//     * 
+//     * The String s contains '1' for a one bit and '0' for zero bit.
+//     * 
+//     * @param bits the bit set where bits are appended
+//     * @param pos the position where to append bits at
+//     * @param s 
+//     * @return the number of bits appended
+//     */
+//    static int appendBits(BitSet bits, int pos, String s) {
+//        if ((bits.size() - pos) < s.length())
+//            return 0; // not enough room to store bits
+//        
+//        for (int i = 0; i < s.length(); i++) {
+//            if (s.charAt(i) == '0')
+//                bits.clear(pos);
+//            else if (s.charAt(i) == '1')
+//                bits.set(pos);
+//            else
+//                // s must contain only 1s and 0s 
+//                throw new IllegalArgumentException(s);
+//            pos++;
+//        }
+//        return s.length();
+//    }
+
+    /**
+     * Appends bits from the given String into the bits BitSet, starting
+     * with position pos.  Return the number of bits appended.
+     * partial appends are not allowed.  If the String cannot be appended
+     * in its entirety then don't append anything and return 0.
+     * 
+     * The String s contains '1' for a one bit and '0' for zero bit.
+     * 
+     * @param bits the bit set where bits are appended
+     * @param pos the position where to append bits at
+     * @param s 
+     * @return the number of bits appended
+     */
+    static int appendBits(byte[] bits, int pos, String s) {
+        if ((bits.length*8 - pos) < s.length())
+            return 0; // not enough room to store bits
+        
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '0')
+                bitClear(bits, pos);
+            else if (s.charAt(i) == '1')
+                bitSet(bits, pos);
+            else
+                // s must contain only 1s and 0s 
+                throw new IllegalArgumentException(s);
+            pos++;
+        }
+        return s.length();
+    }
+    
+    private static void bitClear(byte[] bits, int pos) {
+        int bytePos = pos / 8;
+        bits[bytePos] &= ~(1 << (pos % 8));
+    }
+
+    private static void bitSet(byte[] bits, int pos) {
+        int bytePos = pos / 8;
+        bits[bytePos] |= (1 << (pos % 8));
     }
 }

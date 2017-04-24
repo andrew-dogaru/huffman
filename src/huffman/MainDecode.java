@@ -24,22 +24,34 @@ public class MainDecode {
             
             // Decode the data from the rest of the input file and write
             // it to the output file
-            try {
-                while(true) {
-                    HuffmanDict.Decoder dec = dictionary.startDecoding();
-                    byte decoded = -1;
-                    do {
-                        byte b = input.readByte();
-                        decoded = dec.read(b);
-                    } while (decoded == -1);
+        try {
+            while(true) {
+                HuffmanDict.Decoder decoder = dictionary.startDecoding();
+                byte decoded = -1;
+                do {
+                    byte b = input.readByte();
                     
-                    // we decoded one byte
-                    output.write(decoded);
-                }
+                    for (int i = 0; i < 8; i++) {
+                        byte bit = (((1 << i) & b) != 0) ? (byte)'1' : (byte)'0'; 
+                        decoded = decoder.read(bit);
+                        
+                        if (decoded == -1)
+                            continue;
+
+                        // we decoded one byte
+                        output.write(decoded);
+
+                        // start with new decoder
+                        decoder = dictionary.startDecoding();
+                        decoded = -1;
+                    }
+                } while (decoded == -1);
+
+                // we decoded one byte
+                output.write(decoded);
             }
-            catch (EOFException e) {
-                // end of input stream
-            }
+        }
+        catch (EOFException e) {} // end of input stream
         }
         catch (Console.CancelException e) {
             System.out.println("Program terminated");
